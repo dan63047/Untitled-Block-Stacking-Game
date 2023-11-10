@@ -15,19 +15,20 @@ impl Plugin for UBSGEngine{
             add_state::<GameStates>().
             add_state::<GameloopStates>().
             insert_resource(Engine::default()).
-            add_systems(Startup, init_engine).
-            add_systems(Update, receive_input).
-            add_systems(Update, das_and_arr).
-            add_systems(FixedUpdate, gameloop.run_if(in_state(GameloopStates::Falling))).
+            add_systems(Startup, init_engine.run_if(in_state(GameStates::Gameplay))).
+            add_systems(Update, receive_input.run_if(in_state(GameStates::Gameplay))).
+            add_systems(Update, das_and_arr.run_if(in_state(GameStates::Gameplay))).
+            add_systems(FixedUpdate, gameloop.run_if(in_state(GameStates::Gameplay)).run_if(in_state(GameloopStates::Falling))).
             add_systems(OnEnter(GameloopStates::AfterLocking), after_locking_routine).
+            add_systems(OnEnter(GameloopStates::Spawn), spawn_routine).
             add_systems(Update, draw_board);
     }
 }
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameStates{
-    #[default]
     Init,
+    #[default]
     Gameplay,
     Pause,
     GameOver

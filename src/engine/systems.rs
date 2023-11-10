@@ -1,6 +1,6 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use crate::engine::components::*;
-use super::{resources::Engine, GameloopStates};
+use super::{resources::Engine, GameloopStates, GameStates};
 
 const MINO_SIZE: f32 = 20.0;
 
@@ -20,7 +20,7 @@ pub fn init_engine(
         },
         BoardVisual{}
     ));
-    engine.temporary_random();
+    engine.init("SRS");
     next_state.set(GameloopStates::Falling);
 }
 
@@ -37,7 +37,7 @@ pub fn draw_board(
     let mut y: f32 = 0.0;
 
     // draw board
-    for row in &engine.board.grid {
+    for row in &engine.board.board {
         for mino in row {
             match mino {
                 Some(mino) => {
@@ -104,6 +104,70 @@ pub fn draw_board(
         },
         None => {},
     }
+
+    // draw next queue
+    if engine.board.show_next > 0 {
+        y = 8.0;
+        for i in 0..engine.board.show_next as usize{
+            for mino in &engine.rotation_system.pieces[engine.next_queue[i].id][engine.next_queue[i].rotation]{
+                commands.spawn((
+                    SpriteBundle {
+                        transform: Transform::from_xyz(
+                            11.0*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
+                            y* MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
+                            0.0
+                        ),
+                        texture: asset_server.load("skin.png"),
+                        sprite: Sprite { 
+                            rect: Some(
+                                Rect{
+                                    min: Vec2 { x: 00.0+(64.0*engine.rotation_system.skin_index[engine.next_queue[i].id] as f32), y: 00.0 },
+                                    max: Vec2 { x: 63.0+(64.0*engine.rotation_system.skin_index[engine.next_queue[i].id] as f32), y: 63.0 },
+                                }
+                            ),
+                            custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    Mino{skin_index: engine.rotation_system.skin_index[engine.next_queue[i].id]},
+                ));
+            }
+            y -= 4.0;
+        }
+    }
+
+    // draw hold
+    match engine.hold.as_ref() {
+        Some(piece) => {
+            for mino in &engine.rotation_system.pieces[piece.id][piece.rotation]{
+                commands.spawn((
+                    SpriteBundle {
+                        transform: Transform::from_xyz(
+                            -5.0*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
+                            -2.0*MINO_SIZE + (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
+                            0.0
+                        ),
+                        texture: asset_server.load("skin.png"),
+                        sprite: Sprite { 
+                            rect: Some(
+                                Rect{
+                                    min: Vec2 { x: 00.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 00.0 },
+                                    max: Vec2 { x: 63.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 63.0 },
+                                }
+                            ),
+                            custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    Mino{skin_index: engine.rotation_system.skin_index[piece.id]},
+                ));
+            }
+        },
+        None => {},
+    }
+    
 }
 
 pub fn receive_input(
@@ -117,6 +181,9 @@ pub fn receive_input(
     }
     if keyboard_input.just_pressed(KeyCode::Z) && state.get() == &GameloopStates::Falling {
         engine.rotate_current_piece(-1);
+    }
+    if keyboard_input.just_pressed(KeyCode::C) && state.get() == &GameloopStates::Falling {
+        engine.hold_current_piece();
     }
     if keyboard_input.just_pressed(KeyCode::Left) {
         if state.get() == &GameloopStates::Falling {
@@ -165,7 +232,7 @@ pub fn gameloop(
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
 ) {
-    info!("{:?}", clocks);
+    //info!("{:?}", clocks);
     match engine.current_piece {
         Some(piece) => {
             engine.g_bucket += engine.g;
@@ -197,6 +264,17 @@ pub fn after_locking_routine(
     engine.board.clear_full_lines();
     engine.lock_delay_left = engine.lock_delay;
     engine.lock_delay_resets_left = engine.lock_delay_resets;
-    engine.temporary_random();
-    next_state.set(GameloopStates::Falling);
+    next_state.set(GameloopStates::Spawn);
+}
+
+pub fn spawn_routine(
+    mut engine: ResMut<Engine>,
+    mut next_state: ResMut<NextState<GameloopStates>>,
+    mut game_next_state: ResMut<NextState<GameStates>>
+){
+    if engine.spawn_sequence(){
+        next_state.set(GameloopStates::Falling);
+    }else{
+        game_next_state.set(GameStates::GameOver);
+    }
 }

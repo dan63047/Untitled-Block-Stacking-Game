@@ -1,7 +1,8 @@
-use bevy::prelude::*;
-use rand::random;
+use std::mem::swap;
 
-use super::{rotation_systems::{PiecesData, ROTATION_SYSTEMS}, components::Mino};
+use bevy::prelude::*;
+
+use super::{rotation_systems::{PiecesData, ROTATION_SYSTEMS}, components::Mino, randomizers::{Randomizer, Bag}};
 
 #[derive(Clone, Copy)]
 pub struct Piece{
@@ -10,29 +11,37 @@ pub struct Piece{
     pub rotation: usize
 }
 
+impl Piece {
+    pub fn create(pieces_data: &PiecesData, id: usize) -> Piece{
+        let final_position = (3+pieces_data.spawn_offsets[id].0, 20+pieces_data.spawn_offsets[id].1);
+        Piece { id: id, position: final_position, rotation: 0 }
+    }
+}
+
 pub struct Board{
     pub width: u8,
     pub height: u8,
     pub buffer_height: u8,
     pub show_grid: bool,
     pub show_shadow: bool,
-    // X axis - from left to right; Y axis - from bottom to top (grid[y][x])
-    pub grid: Vec<Vec<Option<Mino>>>
+    pub show_next: u8,
+    // X axis - from left to right; Y axis - from bottom to top (board[y][x])
+    pub board: Vec<Vec<Option<Mino>>>
 }
 
 impl Board{
-    pub fn create(width: u8, height: u8, buffer_height: u8, show_grid: bool, show_shadow: bool) -> Board {
-        let grid: Vec<Vec<Option<Mino>>> = vec![vec![None; width as usize]; (height+buffer_height) as usize];
-        Board { width: width, height: height, buffer_height: buffer_height, show_grid: show_grid, show_shadow: show_shadow, grid: grid }
+    pub fn create(width: u8, height: u8, buffer_height: u8, show_grid: bool, show_shadow: bool, show_next: u8) -> Board {
+        let board: Vec<Vec<Option<Mino>>> = vec![vec![None; width as usize]; (height+buffer_height) as usize];
+        Board { width: width, height: height, buffer_height: buffer_height, show_grid: show_grid, show_shadow: show_shadow, show_next: show_next, board: board }
     }
 
     pub fn clear_full_lines(&mut self) {
         let mut lines_cleared: usize = 0;
-        for row in 0..self.grid.len(){
-            if self.grid[row-lines_cleared].iter().all(|l| l.is_some()){
-                self.grid.remove(row-lines_cleared);
+        for row in 0..self.board.len(){
+            if self.board[row-lines_cleared].iter().all(|l| l.is_some()){
+                self.board.remove(row-lines_cleared);
                 let empty_row: Vec<Option<Mino>> = vec![None; self.width as usize];
-                self.grid.push(empty_row);
+                self.board.push(empty_row);
                 lines_cleared += 1;
             }
         }
@@ -119,9 +128,11 @@ pub struct Engine {
     pub board: Board,
     pub handling: Handling,
     pub rotation_system: PiecesData,
+    pub randomizer: Box<dyn Randomizer + Sync + Send>,
     pub next_queue: Vec<Piece>,
     pub hold: Option<Piece>,
-    pub can_hold: bool,
+    pub can_hold: bool, // anti-abuse
+    pub hold_enabled: bool, // game rule
     pub g: f32,
     pub g_bucket: f32,
     pub lock_delay: u8,
@@ -134,28 +145,65 @@ impl Default for Engine {
     fn default() -> Engine {
         Engine {
             current_piece: None,
-            board: Board::create(10, 20, 20, true, true),
+            board: Board::create(10, 20, 20, true, true, 3),
             handling: Handling::create(200.0, 33.0, 20.0),
             rotation_system: ROTATION_SYSTEMS["SRS"].clone(),
             next_queue: vec![],
             hold: None,
             can_hold: true,
+            hold_enabled: true,
             g: 1.0/60.0,
             g_bucket: 0.0,
             lock_delay: 30,
             lock_delay_left: 30,
             lock_delay_resets: 15,
-            lock_delay_resets_left: 15
+            lock_delay_resets_left: 15,
+            randomizer: Box::new(Bag{}),
         }
     }
 }
 
 impl Engine {
-    pub fn temporary_random(&mut self){
-        let piece_id = random::<usize>() % self.rotation_system.pieces.len();
-        let final_position = (3+self.rotation_system.spawn_offsets[piece_id].0, 20+self.rotation_system.spawn_offsets[piece_id].1);
-        self.current_piece = Some(Piece { id: piece_id, position: final_position, rotation: 0 });
+    fn from_next_to_current(&mut self){
+        self.current_piece = self.next_queue.first().copied();
+        self.next_queue.remove(0);
+    }
+
+    pub fn init(&mut self, rotation_system: &str){
+        self.rotation_system = ROTATION_SYSTEMS[rotation_system].clone();
+        self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system));
+        self.from_next_to_current();
+    }
+
+    pub fn spawn_sequence(&mut self) -> bool {
+        if self.next_queue.len() <= self.board.show_next as usize {
+            self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system));
+        }
+        self.from_next_to_current();
+        if !self.position_is_valid(self.current_piece.as_ref().unwrap().position, self.current_piece.as_ref().unwrap().rotation){
+            return false;
+        }
+        self.can_hold = true;
         if self.g >= 20.0 { self.current_piece.as_mut().unwrap().position.1 = self.lowest_point_under_current_piece() }
+        true
+    }
+
+    pub fn hold_current_piece(&mut self) -> bool {
+        if  !self.hold_enabled || !self.can_hold {
+            return false;
+        }
+        self.current_piece.as_mut().unwrap().rotation = 0;
+        match self.hold {
+            Some(_) => {
+                swap(&mut self.current_piece, &mut self.hold);
+            }
+            None => {
+                self.hold = self.current_piece;
+                self.from_next_to_current();
+            },
+        }
+        self.can_hold = false;
+        true
     }
 
     pub fn lock_current_piece(&mut self) -> bool {
@@ -167,7 +215,7 @@ impl Engine {
         for mino in minos_to_write{
             let x = (self.current_piece.as_ref().unwrap().position.0 + mino.0 as isize) as usize;
             let y = (self.current_piece.as_ref().unwrap().position.1 + mino.1 as isize) as usize;
-            self.board.grid[y][x] = Some(Mino{ skin_index: color_index });
+            self.board.board[y][x] = Some(Mino{ skin_index: color_index });
         }
         self.current_piece = None;
         return true;
@@ -225,7 +273,7 @@ impl Engine {
 
     pub fn position_is_valid(&self, future_position: (isize, isize), future_rotation: usize) -> bool {
         for mino in &self.rotation_system.pieces[self.current_piece.as_ref().unwrap().id][future_rotation]{
-            match self.board.grid.get((future_position.1 + mino.1 as isize) as usize) {
+            match self.board.board.get((future_position.1 + mino.1 as isize) as usize) {
                 Some(line) => match line.get((future_position.0 + mino.0 as isize) as usize) {
                     Some(cell) => match cell {
                         Some(_) => return false,
