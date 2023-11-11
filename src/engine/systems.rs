@@ -48,14 +48,9 @@ pub fn draw_board(
                                 y*MINO_SIZE-(engine.board.height as f32)/2.0*MINO_SIZE+MINO_SIZE/2.0, 
                                 0.0
                             ),
-                            texture: asset_server.load("skin.png"),
+                            texture: asset_server.load("default_mino.png"),
                             sprite: Sprite { 
-                                rect: Some(
-                                    Rect{
-                                        min: Vec2 { x: 0.0+(64.0*mino.skin_index as f32), y: 0.0 },
-                                        max: Vec2 { x: 63.0+(64.0*mino.skin_index as f32), y: 63.0 },
-                                    }
-                                ),
+                                color: mino.color,
                                 custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
                                 ..default()
                             },
@@ -83,22 +78,17 @@ pub fn draw_board(
                         transform: Transform::from_xyz(
                             x*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
                             y*MINO_SIZE - (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
-                            0.0
+                            1.0
                         ),
-                        texture: asset_server.load("skin.png"),
+                        texture: asset_server.load("default_mino.png"),
                         sprite: Sprite { 
-                            rect: Some(
-                                Rect{
-                                    min: Vec2 { x: 00.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 00.0 },
-                                    max: Vec2 { x: 63.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 63.0 },
-                                }
-                            ),
+                            color: engine.rotation_system.colours[piece.id],
                             custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{skin_index: engine.rotation_system.skin_index[piece.id]},
+                    Mino{color: engine.rotation_system.colours[piece.id]},
                 ));
             }
         },
@@ -117,20 +107,15 @@ pub fn draw_board(
                             y* MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
                             0.0
                         ),
-                        texture: asset_server.load("skin.png"),
+                        texture: asset_server.load("default_mino.png"),
                         sprite: Sprite { 
-                            rect: Some(
-                                Rect{
-                                    min: Vec2 { x: 00.0+(64.0*engine.rotation_system.skin_index[engine.next_queue[i].id] as f32), y: 00.0 },
-                                    max: Vec2 { x: 63.0+(64.0*engine.rotation_system.skin_index[engine.next_queue[i].id] as f32), y: 63.0 },
-                                }
-                            ),
+                            color: engine.rotation_system.colours[engine.next_queue[i].id],
                             custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{skin_index: engine.rotation_system.skin_index[engine.next_queue[i].id]},
+                    Mino{color: engine.rotation_system.colours[engine.next_queue[i].id]},
                 ));
             }
             y -= 4.0;
@@ -148,26 +133,50 @@ pub fn draw_board(
                             -2.0*MINO_SIZE + (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
                             0.0
                         ),
-                        texture: asset_server.load("skin.png"),
+                        texture: asset_server.load("default_mino.png"),
                         sprite: Sprite { 
-                            rect: Some(
-                                Rect{
-                                    min: Vec2 { x: 00.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 00.0 },
-                                    max: Vec2 { x: 63.0+(64.0*engine.rotation_system.skin_index[piece.id] as f32), y: 63.0 },
-                                }
-                            ),
+                            color: piece.color,
                             custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{skin_index: engine.rotation_system.skin_index[piece.id]},
+                    Mino{color: piece.color},
                 ));
             }
         },
         None => {},
     }
     
+    // draw shadow
+    if engine.board.show_shadow {
+        match engine.current_piece.as_ref() {
+            Some(piece) => {
+                x = piece.position.0 as f32;
+                y = engine.lowest_point_under_current_piece() as f32;
+                for mino in &engine.rotation_system.pieces[piece.id][piece.rotation]{
+                    commands.spawn((
+                        SpriteBundle {
+                            transform: Transform::from_xyz(
+                                x*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
+                                y*MINO_SIZE - (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
+                                0.0
+                            ),
+                            texture: asset_server.load("default_mino.png"),
+                            sprite: Sprite { 
+                                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.1 },
+                                custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        Mino{color: engine.rotation_system.colours[piece.id]},
+                    ));
+                }
+            },
+            None => {},
+        }
+    }
 }
 
 pub fn receive_input(
@@ -246,7 +255,7 @@ pub fn gameloop(
             }else{
                 engine.lock_delay_left = engine.lock_delay;
             }
-            if engine.lock_delay_left < 1 && !engine.position_is_valid((piece.position.0, piece.position.1-1), piece.rotation){
+            if (engine.lock_delay_left < 1 || engine.need_to_lock) && !engine.position_is_valid((piece.position.0, piece.position.1-1), piece.rotation){
                 engine.lock_current_piece();
                 next_state.set(GameloopStates::AfterLocking);
             }

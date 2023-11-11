@@ -1,4 +1,4 @@
-use bevy::utils::HashMap;
+use bevy::{utils::HashMap, prelude::Color};
 use lazy_static::lazy_static;
 
 #[derive(Clone)]
@@ -16,8 +16,7 @@ pub struct PiecesData {
     pub pieces: Vec<Vec<Vec<(u8, u8)>>>,
     // X and Y shifts for pieces (kicks[piece][rotation before spin][direction of rotation] = Vec of points for tests)
     pub kicks: Vec<Vec<Vec<Vec<(i8, i8)>>>>,
-    // Takes 64x64 sprite fragment with this index as Mino skin (skin_index[piece])
-    pub skin_index: Vec<usize>,
+    pub colours: Vec<Color>,
     // If spawn position is fucked, it fixes it
     pub spawn_offsets: Vec<(isize, isize)>,
     pub lock_delay_mode: LockDelayMode
@@ -199,7 +198,15 @@ lazy_static!{
                         ] 
                 ],
             ],
-            skin_index: vec![0, 1, 2, 3, 4, 5, 6],
+            colours: vec![
+                Color::RED,    // Z
+                Color::Rgba { red: 0.0, green: 0.3, blue: 1.0, alpha: 1.0 },  // J
+                Color::CYAN,   // I
+                Color::Rgba { red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0 },  // T
+                Color::YELLOW, // O
+                Color::ORANGE, // L
+                Color::GREEN   // Z
+            ],
             spawn_offsets: vec![
                 (0,  0), // Z
                 (0,  0), // J
