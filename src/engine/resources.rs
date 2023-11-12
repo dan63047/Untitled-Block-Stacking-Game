@@ -274,7 +274,6 @@ impl Engine {
                 }
             },
         }
-        info!("lock resets: {}, lock delay: {}", self.lock_delay_resets_left, self.lock_delay_left);
     }
 
     pub fn rotate_current_piece(&mut self, rotation: i8) -> bool {
@@ -287,12 +286,12 @@ impl Engine {
         }else{
             1
         };
+        self.lock_delay_check((0, 0));
         for test in &self.rotation_system.kicks[self.current_piece.as_ref().unwrap().id][self.current_piece.as_ref().unwrap().rotation][id_for_kicks]{
             let future_position = (self.current_piece.as_ref().unwrap().position.0 + test.0 as isize, self.current_piece.as_ref().unwrap().position.1 + test.1 as isize);
             if self.position_is_valid(future_position, future_rotation) {
                 self.current_piece.as_mut().unwrap().rotation = future_rotation;
                 self.current_piece.as_mut().unwrap().position = future_position;
-                self.lock_delay_check(*test);
                 return true;
             }
         }
@@ -303,12 +302,12 @@ impl Engine {
         if (shift.0 == 0 && shift.1 == 0) || self.current_piece.is_none(){
             return true;
         }
-        self.lock_delay_check(shift);
         let future_position = (
             self.current_piece.as_ref().unwrap().position.0 + shift.0 as isize, // future X
             self.current_piece.as_ref().unwrap().position.1 + shift.1 as isize  // future Y
         );
         if self.position_is_valid(future_position, self.current_piece.as_ref().unwrap().rotation) {
+            if shift.0 != 0 {self.lock_delay_check(shift);}
             self.current_piece.as_mut().unwrap().position = future_position;
             true
         }else {
