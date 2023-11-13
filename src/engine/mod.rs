@@ -1,10 +1,11 @@
 use bevy::prelude::*;
-use self::{systems::*, resources::Engine};
+use self::{systems::*, resources::Engine, ui::spawn_hud};
 
 mod rotation_systems;
 mod systems;
 mod components;
 mod resources;
+mod ui;
 pub mod randomizers;
 
 pub struct UBSGEngine;
@@ -16,6 +17,7 @@ impl Plugin for UBSGEngine{
             add_state::<GameloopStates>().
             insert_resource(Engine::default()).
             add_systems(Startup, init_engine.run_if(in_state(GameStates::Gameplay))).
+            add_systems(Startup, spawn_hud).
             add_systems(Update, receive_input.run_if(in_state(GameStates::Gameplay))).
             add_systems(Update, das_and_arr.run_if(in_state(GameStates::Gameplay))).
             add_systems(FixedUpdate, gameloop.run_if(in_state(GameStates::Gameplay)).run_if(in_state(GameloopStates::Falling))).

@@ -238,6 +238,7 @@ pub fn das_and_arr(
 
 pub fn gameloop(
     clocks: Res<Time<Fixed>>,
+    mut lock_delay_text: Query<&mut Text, With<LockDelayText>>,
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
 ) {
@@ -251,7 +252,17 @@ pub fn gameloop(
                 engine.g_bucket -= 1.0;
             }
             if !engine.position_is_valid((piece.position.0, piece.position.1-1), piece.rotation){
-                engine.lock_delay_left -= 1;
+                match engine.rotation_system.lock_delay_mode {
+                    super::rotation_systems::LockDelayMode::Disabled => {
+                        engine.lock_current_piece();
+                        next_state.set(GameloopStates::AfterLocking);
+                        return;
+                    },
+                    super::rotation_systems::LockDelayMode::Gravity => {engine.need_to_lock = true;},
+                    super::rotation_systems::LockDelayMode::ResetOnYChange => {},
+                    super::rotation_systems::LockDelayMode::ResetOnMovementLimited => {engine.lock_delay_left -= 1;},
+                    super::rotation_systems::LockDelayMode::ResetOnMovement => {engine.lock_delay_left -= 1;}
+                }
             }else{
                 engine.lock_delay_left = engine.lock_delay;
             }
@@ -263,6 +274,9 @@ pub fn gameloop(
         None => {
             
         },
+    }
+    for mut text in lock_delay_text.iter_mut() {
+        text.sections[0].value = format!("{}; {}", engine.lock_delay_resets_left, engine.lock_delay_left);
     }
 }
 
