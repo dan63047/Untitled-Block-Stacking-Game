@@ -1,6 +1,6 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use super::{resources::Engine, rotation_systems::LockDelayMode, GameStates, GameloopStates};
 use crate::engine::components::*;
-use super::{resources::Engine, GameloopStates, GameStates};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 const MINO_SIZE: f32 = 20.0;
 
@@ -10,15 +10,23 @@ pub fn init_engine(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
-){
+) {
     commands.spawn((
         MaterialMesh2dBundle {
-            mesh: meshes.add(Mesh::from(shape::Quad{ size: Vec2 { x: engine.board.width as f32 * MINO_SIZE, y: engine.board.height as f32 * MINO_SIZE }, flip: false })).into(),
+            mesh: meshes
+                .add(Mesh::from(shape::Quad {
+                    size: Vec2 {
+                        x: engine.board.width as f32 * MINO_SIZE,
+                        y: engine.board.height as f32 * MINO_SIZE,
+                    },
+                    flip: false,
+                }))
+                .into(),
             material: materials.add(ColorMaterial::from(Color::PURPLE)),
             transform: Transform::from_xyz(0.0, 0.0, -1.0),
             ..default()
         },
-        BoardVisual{}
+        BoardVisual {},
     ));
     engine.init("SRS");
     next_state.set(GameloopStates::Falling);
@@ -28,8 +36,8 @@ pub fn draw_board(
     mut commands: Commands,
     engine: Res<Engine>,
     all_minos: Query<Entity, With<Mino>>,
-    asset_server: Res<AssetServer>
-){
+    asset_server: Res<AssetServer>,
+) {
     for mino in all_minos.iter() {
         commands.entity(mino).despawn();
     }
@@ -44,14 +52,19 @@ pub fn draw_board(
                     commands.spawn((
                         SpriteBundle {
                             transform: Transform::from_xyz(
-                                x*MINO_SIZE-(engine.board.width as f32)/2.0*MINO_SIZE+MINO_SIZE/2.0, 
-                                y*MINO_SIZE-(engine.board.height as f32)/2.0*MINO_SIZE+MINO_SIZE/2.0, 
-                                0.0
+                                x * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                                    + MINO_SIZE / 2.0,
+                                y * MINO_SIZE - (engine.board.height as f32) / 2.0 * MINO_SIZE
+                                    + MINO_SIZE / 2.0,
+                                0.0,
                             ),
                             texture: asset_server.load("default_mino.png"),
-                            sprite: Sprite { 
+                            sprite: Sprite {
                                 color: mino.color,
-                                custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                                custom_size: Some(Vec2 {
+                                    x: MINO_SIZE,
+                                    y: MINO_SIZE,
+                                }),
                                 ..default()
                             },
                             ..default()
@@ -59,7 +72,7 @@ pub fn draw_board(
                         *mino,
                     ));
                 }
-                None => {},
+                None => {}
             };
             x += 1.0;
         }
@@ -72,50 +85,68 @@ pub fn draw_board(
         Some(piece) => {
             x = piece.position.0 as f32;
             y = piece.position.1 as f32;
-            for mino in &engine.rotation_system.pieces[piece.id][piece.rotation]{
+            for mino in &engine.rotation_system.pieces[piece.id][piece.rotation] {
                 commands.spawn((
                     SpriteBundle {
                         transform: Transform::from_xyz(
-                            x*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
-                            y*MINO_SIZE - (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
-                            1.0
+                            x * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                                + MINO_SIZE / 2.0
+                                + mino.0 as f32 * MINO_SIZE,
+                            y * MINO_SIZE - (engine.board.height as f32) / 2.0 * MINO_SIZE
+                                + MINO_SIZE / 2.0
+                                + mino.1 as f32 * MINO_SIZE,
+                            1.0,
                         ),
                         texture: asset_server.load("default_mino.png"),
-                        sprite: Sprite { 
+                        sprite: Sprite {
                             color: engine.rotation_system.colours[piece.id],
-                            custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            custom_size: Some(Vec2 {
+                                x: MINO_SIZE,
+                                y: MINO_SIZE,
+                            }),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{color: engine.rotation_system.colours[piece.id]},
+                    Mino {
+                        color: engine.rotation_system.colours[piece.id],
+                    },
                 ));
             }
-        },
-        None => {},
+        }
+        None => {}
     }
 
     // draw next queue
     if engine.board.show_next > 0 {
         y = 8.0;
-        for i in 0..engine.board.show_next as usize{
-            for mino in &engine.rotation_system.pieces[engine.next_queue[i].id][engine.next_queue[i].rotation]{
+        for i in 0..engine.board.show_next as usize {
+            for mino in &engine.rotation_system.pieces[engine.next_queue[i].id]
+                [engine.next_queue[i].rotation]
+            {
                 commands.spawn((
                     SpriteBundle {
                         transform: Transform::from_xyz(
-                            11.0*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
-                            y* MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
-                            0.0
+                            11.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                                + MINO_SIZE / 2.0
+                                + mino.0 as f32 * MINO_SIZE,
+                            y * MINO_SIZE + MINO_SIZE / 2.0 + mino.1 as f32 * MINO_SIZE,
+                            0.0,
                         ),
                         texture: asset_server.load("default_mino.png"),
-                        sprite: Sprite { 
+                        sprite: Sprite {
                             color: engine.rotation_system.colours[engine.next_queue[i].id],
-                            custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            custom_size: Some(Vec2 {
+                                x: MINO_SIZE,
+                                y: MINO_SIZE,
+                            }),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{color: engine.rotation_system.colours[engine.next_queue[i].id]},
+                    Mino {
+                        color: engine.rotation_system.colours[engine.next_queue[i].id],
+                    },
                 ));
             }
             y -= 4.0;
@@ -125,56 +156,78 @@ pub fn draw_board(
     // draw hold
     match engine.hold.as_ref() {
         Some(piece) => {
-            for mino in &engine.rotation_system.pieces[piece.id][piece.rotation]{
+            for mino in &engine.rotation_system.pieces[piece.id][piece.rotation] {
                 commands.spawn((
                     SpriteBundle {
                         transform: Transform::from_xyz(
-                            -5.0*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
-                            -2.0*MINO_SIZE + (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
-                            0.0
+                            -5.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                                + MINO_SIZE / 2.0
+                                + mino.0 as f32 * MINO_SIZE,
+                            -2.0 * MINO_SIZE
+                                + (engine.board.height as f32) / 2.0 * MINO_SIZE
+                                + MINO_SIZE / 2.0
+                                + mino.1 as f32 * MINO_SIZE,
+                            0.0,
                         ),
                         texture: asset_server.load("default_mino.png"),
-                        sprite: Sprite { 
+                        sprite: Sprite {
                             color: piece.color,
-                            custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            custom_size: Some(Vec2 {
+                                x: MINO_SIZE,
+                                y: MINO_SIZE,
+                            }),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino{color: piece.color},
+                    Mino { color: piece.color },
                 ));
             }
-        },
-        None => {},
+        }
+        None => {}
     }
-    
+
     // draw shadow
     if engine.board.show_shadow {
         match engine.current_piece.as_ref() {
             Some(piece) => {
                 x = piece.position.0 as f32;
                 y = engine.lowest_point_under_current_piece() as f32;
-                for mino in &engine.rotation_system.pieces[piece.id][piece.rotation]{
+                for mino in &engine.rotation_system.pieces[piece.id][piece.rotation] {
                     commands.spawn((
                         SpriteBundle {
                             transform: Transform::from_xyz(
-                                x*MINO_SIZE - (engine.board.width  as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.0 as f32 * MINO_SIZE, 
-                                y*MINO_SIZE - (engine.board.height as f32)/2.0*MINO_SIZE + MINO_SIZE/2.0 + mino.1 as f32 * MINO_SIZE,
-                                0.0
+                                x * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                                    + MINO_SIZE / 2.0
+                                    + mino.0 as f32 * MINO_SIZE,
+                                y * MINO_SIZE - (engine.board.height as f32) / 2.0 * MINO_SIZE
+                                    + MINO_SIZE / 2.0
+                                    + mino.1 as f32 * MINO_SIZE,
+                                0.0,
                             ),
                             texture: asset_server.load("default_mino.png"),
-                            sprite: Sprite { 
-                                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 0.1 },
-                                custom_size: Some(Vec2 {x: MINO_SIZE, y: MINO_SIZE}),
+                            sprite: Sprite {
+                                color: Color::Rgba {
+                                    red: 1.0,
+                                    green: 1.0,
+                                    blue: 1.0,
+                                    alpha: 0.1,
+                                },
+                                custom_size: Some(Vec2 {
+                                    x: MINO_SIZE,
+                                    y: MINO_SIZE,
+                                }),
                                 ..default()
                             },
                             ..default()
                         },
-                        Mino{color: engine.rotation_system.colours[piece.id]},
+                        Mino {
+                            color: engine.rotation_system.colours[piece.id],
+                        },
                     ));
                 }
-            },
-            None => {},
+            }
+            None => {}
         }
     }
 }
@@ -184,8 +237,10 @@ pub fn receive_input(
     mut engine: ResMut<Engine>,
     state: Res<State<GameloopStates>>,
     mut next_state: ResMut<NextState<GameloopStates>>,
-){
-    if keyboard_input.any_just_pressed([KeyCode::Up, KeyCode::X]) && state.get() == &GameloopStates::Falling {
+) {
+    if keyboard_input.any_just_pressed([KeyCode::Up, KeyCode::X])
+        && state.get() == &GameloopStates::Falling
+    {
         engine.rotate_current_piece(1);
     }
     if keyboard_input.just_pressed(KeyCode::Z) && state.get() == &GameloopStates::Falling {
@@ -225,15 +280,11 @@ pub fn receive_input(
     }
 }
 
-pub fn das_and_arr(
-    mut engine: ResMut<Engine>,
-    time: Res<Time>,
-    state: Res<State<GameloopStates>>,
-){
-    let direction = engine.handling.movement_tick(time.delta_seconds()*1000.0);
-    if state.get() == &GameloopStates::Falling{
+pub fn das_and_arr(mut engine: ResMut<Engine>, time: Res<Time>, state: Res<State<GameloopStates>>) {
+    let direction = engine.handling.movement_tick(time.delta_seconds() * 1000.0);
+    if state.get() == &GameloopStates::Falling {
         engine.move_current_piece((direction, 0));
-    } 
+    }
 }
 
 pub fn gameloop(
@@ -245,59 +296,99 @@ pub fn gameloop(
     //info!("{:?}", clocks);
     match engine.current_piece {
         Some(piece) => {
-            engine.g_bucket += engine.g;
-            if engine.handling.sdf_active {engine.g_bucket += engine.g * engine.handling.sdf}
+            if engine.handling.sdf_active {
+                engine.g_bucket += engine.g * engine.handling.sdf;
+            } else {
+                engine.g_bucket += engine.g;
+            }
+            let mut gravity_tick_happend = false;
             while engine.g_bucket >= 1.0 {
                 engine.move_current_piece((0, -1));
                 engine.g_bucket -= 1.0;
+                gravity_tick_happend = true;
             }
-            if !engine.position_is_valid((piece.position.0, piece.position.1-1), piece.rotation){
+            let previos_lock_delay_active = engine.lock_delay_active;
+            engine.lock_delay_active =
+                !engine.position_is_valid((piece.position.0, piece.position.1 - 1), piece.rotation);
+            if engine.lock_delay_active {
                 match engine.rotation_system.lock_delay_mode {
-                    super::rotation_systems::LockDelayMode::Disabled => {
-                        engine.lock_current_piece();
-                        next_state.set(GameloopStates::AfterLocking);
-                        return;
-                    },
-                    super::rotation_systems::LockDelayMode::Gravity => {engine.need_to_lock = true;},
-                    super::rotation_systems::LockDelayMode::ResetOnYChange => {},
-                    super::rotation_systems::LockDelayMode::ResetOnMovementLimited => {engine.lock_delay_left -= 1;},
-                    super::rotation_systems::LockDelayMode::ResetOnMovement => {engine.lock_delay_left -= 1;}
+                    LockDelayMode::Disabled => {
+                        engine.need_to_lock = true;
+                    }
+                    LockDelayMode::Gravity => {
+                        if gravity_tick_happend && previos_lock_delay_active {
+                            engine.need_to_lock = true;
+                        }
+                    }
+                    LockDelayMode::ResetOnYChange => {
+                        engine.lock_delay_left -= 1;
+                    }
+                    LockDelayMode::ResetOnMovementLimited => {
+                        engine.lock_delay_left -= 1;
+                    }
+                    LockDelayMode::ResetOnMovement => {
+                        engine.lock_delay_left -= 1;
+                    }
                 }
-            }else{
-                engine.lock_delay_left = engine.lock_delay;
+            } else {
+                if previos_lock_delay_active {
+                    match engine.rotation_system.lock_delay_mode {
+                        LockDelayMode::Disabled => {}
+                        LockDelayMode::Gravity => {}
+                        LockDelayMode::ResetOnYChange => {
+                            engine.lock_delay_left = engine.lock_delay;
+                            if engine.lock_delay_resets == 0 {
+                                engine.need_to_lock = true;
+                            } else {
+                                engine.lock_delay_resets_left -= 1;
+                            }
+                        }
+                        LockDelayMode::ResetOnMovementLimited => {
+                            engine.lock_delay_left = engine.lock_delay;
+                        }
+                        LockDelayMode::ResetOnMovement => {
+                            engine.lock_delay_left = engine.lock_delay;
+                        }
+                    }
+                }
             }
-            if (engine.lock_delay_left < 1 || engine.need_to_lock) && !engine.position_is_valid((piece.position.0, piece.position.1-1), piece.rotation){
+            if (engine.lock_delay_left < 1 || engine.need_to_lock)
+                && !engine
+                    .position_is_valid((piece.position.0, piece.position.1 - 1), piece.rotation)
+            {
                 engine.lock_current_piece();
                 next_state.set(GameloopStates::AfterLocking);
             }
-        },
-        None => {
-            
-        },
+        }
+        None => {}
     }
     for mut text in lock_delay_text.iter_mut() {
-        text.sections[0].value = format!("{}; {}", engine.lock_delay_resets_left, engine.lock_delay_left);
+        text.sections[0].value = format!(
+            "{}; {}",
+            engine.lock_delay_resets_left, engine.lock_delay_left
+        );
     }
 }
 
 pub fn after_locking_routine(
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
-){
+) {
     engine.board.clear_full_lines();
     engine.lock_delay_left = engine.lock_delay;
     engine.lock_delay_resets_left = engine.lock_delay_resets;
+    engine.lock_delay_active = false;
     next_state.set(GameloopStates::Spawn);
 }
 
 pub fn spawn_routine(
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
-    mut game_next_state: ResMut<NextState<GameStates>>
-){
-    if engine.spawn_sequence(){
+    mut game_next_state: ResMut<NextState<GameStates>>,
+) {
+    if engine.spawn_sequence() {
         next_state.set(GameloopStates::Falling);
-    }else{
+    } else {
         game_next_state.set(GameStates::GameOver);
     }
 }

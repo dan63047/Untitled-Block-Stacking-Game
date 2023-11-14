@@ -11,9 +11,11 @@ pub fn build_hud(commands: &mut Commands, asset_server: &Res<AssetServer>) -> En
             NodeBundle {
                 style: Style {
                     display: Display::Flex,
-                    flex_direction: FlexDirection::Column,
-                    justify_items: JustifyItems::Center,
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
                     align_items: AlignItems::Center,
+                    width: Val::Vw(100.0),
+                    height: Val::Vh(100.0),
                     ..default()
                 },
                 ..default()
@@ -25,9 +27,10 @@ pub fn build_hud(commands: &mut Commands, asset_server: &Res<AssetServer>) -> En
             parent.spawn((
                 TextBundle {
                     style: Style {
-                        // position_type: PositionType::Absolute,
-                        // top: Val::Percent(50.0),
-                        // left: Val::Percent(50.0),
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(550.0),
+                        left: Val::Percent(45.0),
+                        align_self: AlignSelf::Center,
                         ..default()
                     },
                     text: Text {

@@ -140,6 +140,7 @@ pub struct Engine {
     pub lock_delay_left: u8,
     pub lock_delay_resets: u8,
     pub lock_delay_resets_left: u8,
+    pub lock_delay_active: bool,
     pub need_to_lock: bool, // when lock resets ended
 }
 
@@ -160,6 +161,7 @@ impl Default for Engine {
             lock_delay_left: 30,
             lock_delay_resets: 15,
             lock_delay_resets_left: 15,
+            lock_delay_active: false,
             need_to_lock: false,
             randomizer: Box::new(Bag{}),
         }
@@ -244,20 +246,15 @@ impl Engine {
         y
     }
 
-    fn lock_delay_check(&mut self, shift: (i8, i8)){
+    fn reset_lock_delay(&mut self, shift: (i8, i8)){
         match self.rotation_system.lock_delay_mode {
             LockDelayMode::Disabled => {},
-            LockDelayMode::Gravity => {},
-            LockDelayMode::ResetOnYChange => {
-                if shift.1 < 0 {
-                    self.lock_delay_left = self.lock_delay;
-                    if self.lock_delay_resets_left == 0{
-                        self.need_to_lock = true;
-                    }else{
-                        self.lock_delay_resets_left -= 1;
-                    }
+            LockDelayMode::Gravity => {
+                if self.position_is_valid((self.current_piece.as_ref().unwrap().position.0, self.current_piece.as_ref().unwrap().position.1-1), self.current_piece.as_ref().unwrap().rotation) {
+                    self.lock_delay_active = false;
                 }
             },
+            LockDelayMode::ResetOnYChange => {},
             LockDelayMode::ResetOnMovementLimited => {
                 if !self.position_is_valid((self.current_piece.as_ref().unwrap().position.0, self.current_piece.as_ref().unwrap().position.1-1), self.current_piece.as_ref().unwrap().rotation){
                     self.lock_delay_left = self.lock_delay;
@@ -265,12 +262,14 @@ impl Engine {
                         self.need_to_lock = true;
                     }else{
                         self.lock_delay_resets_left -= 1;
+                        self.lock_delay_active = false;
                     }
                 }
             },
             LockDelayMode::ResetOnMovement => {
                 if !self.position_is_valid((self.current_piece.as_ref().unwrap().position.0, self.current_piece.as_ref().unwrap().position.1-1), self.current_piece.as_ref().unwrap().rotation){
                     self.lock_delay_left = self.lock_delay;
+                    self.lock_delay_active = false;
                 }
             },
         }
@@ -286,7 +285,7 @@ impl Engine {
         }else{
             1
         };
-        self.lock_delay_check((0, 0));
+        self.reset_lock_delay((0, 0));
         for test in &self.rotation_system.kicks[self.current_piece.as_ref().unwrap().id][self.current_piece.as_ref().unwrap().rotation][id_for_kicks]{
             let future_position = (self.current_piece.as_ref().unwrap().position.0 + test.0 as isize, self.current_piece.as_ref().unwrap().position.1 + test.1 as isize);
             if self.position_is_valid(future_position, future_rotation) {
@@ -307,7 +306,7 @@ impl Engine {
             self.current_piece.as_ref().unwrap().position.1 + shift.1 as isize  // future Y
         );
         if self.position_is_valid(future_position, self.current_piece.as_ref().unwrap().rotation) {
-            if shift.0 != 0 {self.lock_delay_check(shift);}
+            if shift.0 != 0 {self.reset_lock_delay(shift);}
             self.current_piece.as_mut().unwrap().position = future_position;
             true
         }else {
