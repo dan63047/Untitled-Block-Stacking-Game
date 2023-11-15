@@ -18,6 +18,7 @@ impl Plugin for UBSGEngine{
             insert_resource(Engine::default()).
             add_systems(Startup, init_engine.run_if(in_state(GameStates::Gameplay))).
             add_systems(Startup, spawn_hud).
+            add_systems(OnEnter(GameloopStates::Init), init_engine).
             add_systems(Update, receive_input.run_if(in_state(GameStates::Gameplay))).
             add_systems(Update, das_and_arr.run_if(in_state(GameStates::Gameplay))).
             add_systems(FixedUpdate, gameloop.run_if(in_state(GameStates::Gameplay)).run_if(in_state(GameloopStates::Falling))).

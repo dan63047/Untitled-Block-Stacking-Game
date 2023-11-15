@@ -13,8 +13,11 @@ pub struct Piece{
 }
 
 impl Piece {
-    pub fn create(pieces_data: &PiecesData, id: usize) -> Piece{
-        let final_position = (3+pieces_data.spawn_offsets[id].0, 20+pieces_data.spawn_offsets[id].1);
+    pub fn create(pieces_data: &PiecesData, id: usize, board_width: isize, board_height: isize) -> Piece{
+        let final_position = (
+            board_width/2 - 2 + pieces_data.spawn_offsets[id].0,
+            board_height + pieces_data.height_offset + pieces_data.spawn_offsets[id].1
+        );
         Piece { id: id, color: pieces_data.colours[id], position: final_position, rotation: 0 }
     }
 }
@@ -171,7 +174,7 @@ impl Default for Engine {
 impl Engine {
     fn from_next_to_current(&mut self){
         if self.next_queue.len() <= self.board.show_next as usize {
-            self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system));
+            self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system, self.board.width as isize, self.board.height as isize));
         }
         self.current_piece = self.next_queue.first().copied();
         self.next_queue.remove(0);
@@ -179,7 +182,9 @@ impl Engine {
 
     pub fn init(&mut self, rotation_system: &str){
         self.rotation_system = ROTATION_SYSTEMS[rotation_system].clone();
-        self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system));
+        while self.next_queue.len() <= self.board.show_next as usize  {
+            self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system, self.board.width as isize, self.board.height as isize));
+        }
         self.from_next_to_current();
     }
 

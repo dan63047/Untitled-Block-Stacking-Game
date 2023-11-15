@@ -11,6 +11,7 @@ pub fn init_engine(
     mut engine: ResMut<Engine>,
     mut next_state: ResMut<NextState<GameloopStates>>,
 ) {
+    //commands.insert_resource(Engine::default());
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: meshes
@@ -28,7 +29,7 @@ pub fn init_engine(
         },
         BoardVisual {},
     ));
-    engine.init("SRS");
+    engine.init("NRS");
     next_state.set(GameloopStates::Falling);
 }
 
@@ -238,6 +239,9 @@ pub fn receive_input(
     state: Res<State<GameloopStates>>,
     mut next_state: ResMut<NextState<GameloopStates>>,
 ) {
+    if keyboard_input.just_pressed(KeyCode::R) && state.get() != &GameloopStates::Init {
+        next_state.set(GameloopStates::Init);
+    }
     if keyboard_input.any_just_pressed([KeyCode::Up, KeyCode::X])
         && state.get() == &GameloopStates::Falling
     {

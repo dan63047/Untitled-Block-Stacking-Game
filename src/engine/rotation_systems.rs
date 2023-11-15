@@ -19,7 +19,9 @@ pub struct PiecesData {
     pub colours: Vec<Color>,
     // If spawn position is fucked, it fixes it
     pub spawn_offsets: Vec<(isize, isize)>,
-    pub lock_delay_mode: LockDelayMode
+    pub lock_delay_mode: LockDelayMode,
+    // How high above field that piece should be spawned
+    pub height_offset: isize,
 }
 
 lazy_static!{
@@ -53,9 +55,6 @@ lazy_static!{
                 ],
                 vec![ // O
                     vec![(0, 0), (0, 1), (1, 1), (1, 0)],
-                    vec![(0, 1), (1, 1), (1, 0), (0, 0)],
-                    vec![(1, 1), (1, 0), (0, 0), (0, 1)],
-                    vec![(1, 0), (0, 0), (0, 1), (1, 1)]
                 ],
                 vec![ // L
                     vec![(2, 2), (2, 1), (1, 1), (0, 1)],
@@ -148,18 +147,6 @@ lazy_static!{
                         vec![( 0, 0)], // 0 -> 90
                         vec![( 0, 0)], // 0 -> 270
                         ],
-                    vec![
-                        vec![( 0, 0)], // 90 -> 180
-                        vec![( 0, 0)], // 90 -> 0
-                        ],
-                    vec![
-                        vec![( 0, 0)], // 180 -> 270
-                        vec![( 0, 0)], // 180 -> 90
-                        ], 
-                    vec![
-                        vec![( 0, 0)], // 270 -> 0
-                        vec![( 0, 0)], // 270 -> 180
-                        ] 
                 ],
                 vec![ // L
                     vec![
@@ -216,7 +203,100 @@ lazy_static!{
                 (0,  0), // L
                 (0,  0)  // S
             ],
-            lock_delay_mode: LockDelayMode::ResetOnMovementLimited
+            lock_delay_mode: LockDelayMode::ResetOnMovementLimited,
+            height_offset: 0,
+        });
+        rs.insert(String::from("NRS"), PiecesData {
+            pieces: vec![
+                vec![ // Z
+                    vec![(0, 1), (1, 1), (1, 0), (2, 0)],
+                    vec![(2, 2), (2, 1), (1, 1), (1, 0)],
+                ],
+                vec![ // J
+                    vec![(2, 0), (2, 1), (1, 1), (0, 1)],
+                    vec![(0, 0), (1, 0), (1, 1), (1, 2)],
+                    vec![(0, 2), (0, 1), (1, 1), (2, 1)],
+                    vec![(2, 2), (1, 2), (1, 1), (1, 0)],
+                ],
+                vec![ // I
+                    vec![(3, 1), (2, 1), (1, 1), (0, 1)],
+                    vec![(2, 3), (2, 2), (2, 1), (2, 0)],
+                ],
+                vec![ // T
+                    vec![(1, 0), (2, 1), (1, 1), (0, 1)],
+                    vec![(0, 1), (1, 0), (1, 1), (1, 2)],
+                    vec![(1, 2), (0, 1), (1, 1), (2, 1)],
+                    vec![(2, 1), (1, 2), (1, 1), (1, 0)],
+                ],
+                vec![ // O
+                    vec![(0, 0), (0, 1), (1, 1), (1, 0)],
+                ],
+                vec![ // L
+                    vec![(0, 0), (0, 1), (1, 1), (2, 1)],
+                    vec![(0, 2), (1, 2), (1, 1), (1, 0)],
+                    vec![(2, 2), (2, 1), (1, 1), (0, 1)],
+                    vec![(2, 0), (1, 0), (1, 1), (1, 2)],
+                ],
+                vec![ // S
+                    vec![(0, 0), (1, 0), (1, 1), (2, 1)],
+                    vec![(2, 0), (2, 1), (1, 1), (1, 2)],
+                ]
+            ],
+            kicks: vec![
+                vec![ // Z
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // J
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // I
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // T
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // O
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // L
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+                vec![ // S
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                    vec![vec![( 0, 0)], vec![( 0, 0)]],
+                ],
+            ],
+            colours: vec![
+                Color::RED,    // Z
+                Color::Rgba { red: 0.0, green: 0.3, blue: 1.0, alpha: 1.0 },  // J
+                Color::CYAN,   // I
+                Color::Rgba { red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0 },  // T
+                Color::YELLOW, // O
+                Color::ORANGE, // L
+                Color::GREEN   // Z
+            ],
+            spawn_offsets: vec![
+                (0,  0), // Z
+                (0,  0), // J
+                (0,  0), // I
+                (0,  0), // T
+                (1,  0), // O
+                (0,  0), // L
+                (0,  0)  // S
+            ],
+            height_offset: -2,
+            lock_delay_mode: LockDelayMode::Gravity 
         });
         rs
     };
