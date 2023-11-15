@@ -180,8 +180,9 @@ impl Engine {
         self.next_queue.remove(0);
     }
 
-    pub fn init(&mut self, rotation_system: &str){
+    pub fn init(&mut self, rotation_system: &str, randomizer: Box<dyn Randomizer + Sync + Send>){
         self.rotation_system = ROTATION_SYSTEMS[rotation_system].clone();
+        self.randomizer = randomizer;
         while self.next_queue.len() <= self.board.show_next as usize  {
             self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system, self.board.width as isize, self.board.height as isize));
         }

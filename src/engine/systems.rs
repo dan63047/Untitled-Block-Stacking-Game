@@ -1,4 +1,4 @@
-use super::{resources::Engine, rotation_systems::LockDelayMode, GameStates, GameloopStates};
+use super::{resources::Engine, rotation_systems::LockDelayMode, GameStates, GameloopStates, randomizers::*};
 use crate::engine::components::*;
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
@@ -29,7 +29,7 @@ pub fn init_engine(
         },
         BoardVisual {},
     ));
-    engine.init("NRS");
+    engine.init("SRS", Box::new(BagX2::create()));
     next_state.set(GameloopStates::Falling);
 }
 
