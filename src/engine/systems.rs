@@ -4,14 +4,23 @@ use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
 const MINO_SIZE: f32 = 20.0;
 
+pub fn reset_engine(mut commands: Commands){
+    commands.remove_resource::<Engine>();
+    commands.insert_resource::<Engine>(Engine::default());
+}
+
 pub fn init_engine(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut engine: ResMut<Engine>,
+    mut old_board: Query<Entity, With<BoardVisual>>,
     mut next_state: ResMut<NextState<GameloopStates>>,
+    mut game_next_state: ResMut<NextState<GameStates>>,
 ) {
-    //commands.insert_resource(Engine::default());
+    for board in old_board.iter() {
+        commands.entity(board).despawn();
+    }
     commands.spawn((
         MaterialMesh2dBundle {
             mesh: meshes
@@ -29,7 +38,8 @@ pub fn init_engine(
         },
         BoardVisual {},
     ));
-    engine.init("SRS", Box::new(BagX2::create()));
+    engine.init("NRS", Box::new(RandomWithoutDirectRepetition::create()));
+    game_next_state.set(GameStates::Gameplay);
     next_state.set(GameloopStates::Falling);
 }
 
@@ -121,22 +131,23 @@ pub fn draw_board(
     // draw next queue
     if engine.board.show_next > 0 {
         y = 8.0;
-        for i in 0..engine.board.show_next as usize {
-            for mino in &engine.rotation_system.pieces[engine.next_queue[i].id]
-                [engine.next_queue[i].rotation]
+        let mut drawed = 0;
+        for mino in &engine.next_queue {
+            for tile in &engine.rotation_system.pieces[mino.id]
+                [mino.rotation]
             {
                 commands.spawn((
                     SpriteBundle {
                         transform: Transform::from_xyz(
                             11.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
                                 + MINO_SIZE / 2.0
-                                + mino.0 as f32 * MINO_SIZE,
-                            y * MINO_SIZE + MINO_SIZE / 2.0 + mino.1 as f32 * MINO_SIZE,
+                                + tile.0 as f32 * MINO_SIZE,
+                            y * MINO_SIZE + MINO_SIZE / 2.0 + tile.1 as f32 * MINO_SIZE,
                             0.0,
                         ),
                         texture: asset_server.load("default_mino.png"),
                         sprite: Sprite {
-                            color: engine.rotation_system.colours[engine.next_queue[i].id],
+                            color: engine.rotation_system.colours[mino.id],
                             custom_size: Some(Vec2 {
                                 x: MINO_SIZE,
                                 y: MINO_SIZE,
@@ -146,11 +157,15 @@ pub fn draw_board(
                         ..default()
                     },
                     Mino {
-                        color: engine.rotation_system.colours[engine.next_queue[i].id],
+                        color: engine.rotation_system.colours[mino.id],
                     },
                 ));
             }
             y -= 4.0;
+            drawed += 1;
+            if drawed >= engine.board.show_next {
+                break;
+            }
         }
     }
 
@@ -238,8 +253,11 @@ pub fn receive_input(
     mut engine: ResMut<Engine>,
     state: Res<State<GameloopStates>>,
     mut next_state: ResMut<NextState<GameloopStates>>,
+    mut game_next_state: ResMut<NextState<GameStates>>,
+    mut commands: Commands
 ) {
     if keyboard_input.just_pressed(KeyCode::R) && state.get() != &GameloopStates::Init {
+        reset_engine(commands);
         next_state.set(GameloopStates::Init);
     }
     if keyboard_input.any_just_pressed([KeyCode::Up, KeyCode::X])
@@ -282,6 +300,18 @@ pub fn receive_input(
         engine.lock_current_piece();
         next_state.set(GameloopStates::AfterLocking);
     }
+}
+
+pub fn receive_input_on_game_over(
+    keyboard_input: Res<Input<KeyCode>>,
+    state: Res<State<GameloopStates>>,
+    mut next_state: ResMut<NextState<GameloopStates>>,
+    mut commands: Commands
+){
+    if keyboard_input.just_pressed(KeyCode::R) && state.get() != &GameloopStates::Init {
+        reset_engine(commands);
+        next_state.set(GameloopStates::Init);
+    } 
 }
 
 pub fn das_and_arr(mut engine: ResMut<Engine>, time: Res<Time>, state: Res<State<GameloopStates>>) {
