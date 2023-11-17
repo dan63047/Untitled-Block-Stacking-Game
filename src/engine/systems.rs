@@ -38,7 +38,7 @@ pub fn init_engine(
         },
         BoardVisual {},
     ));
-    engine.init("NRS", Box::new(RandomWithoutDirectRepetition::create()));
+    engine.init("ARS", Box::new(TGM::create()));
     game_next_state.set(GameStates::Gameplay);
     next_state.set(GameloopStates::Falling);
 }

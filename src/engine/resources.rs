@@ -252,7 +252,7 @@ impl Engine {
         y
     }
 
-    fn reset_lock_delay(&mut self, shift: (i8, i8)){
+    fn reset_lock_delay(&mut self){
         match self.rotation_system.lock_delay_mode {
             LockDelayMode::Disabled => {},
             LockDelayMode::Gravity => {
@@ -291,7 +291,7 @@ impl Engine {
         }else{
             1
         };
-        self.reset_lock_delay((0, 0));
+        self.reset_lock_delay();
         for test in &self.rotation_system.kicks[self.current_piece.as_ref().unwrap().id][self.current_piece.as_ref().unwrap().rotation][id_for_kicks]{
             let future_position = (self.current_piece.as_ref().unwrap().position.0 + test.0 as isize, self.current_piece.as_ref().unwrap().position.1 + test.1 as isize);
             if self.position_is_valid(future_position, future_rotation) {
@@ -312,7 +312,7 @@ impl Engine {
             self.current_piece.as_ref().unwrap().position.1 + shift.1 as isize  // future Y
         );
         if self.position_is_valid(future_position, self.current_piece.as_ref().unwrap().rotation) {
-            if shift.0 != 0 {self.reset_lock_delay(shift);}
+            if shift.0 != 0 {self.reset_lock_delay();}
             self.current_piece.as_mut().unwrap().position = future_position;
             true
         }else {

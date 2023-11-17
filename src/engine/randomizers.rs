@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use rand::{seq::SliceRandom, random};
 use rand::thread_rng;
 
@@ -14,6 +16,11 @@ pub struct BagX2 {}
 
 pub struct RandomWithoutDirectRepetition {
     memory: usize
+}
+
+pub struct TGM {
+    memory: Vec<usize>,
+    seed: u32
 }
 
 impl Randomizer for Bag {
@@ -69,5 +76,46 @@ impl Randomizer for RandomWithoutDirectRepetition {
 
     fn create() -> Self where Self: Sized {
         RandomWithoutDirectRepetition { memory: 65535 }
+    }
+}
+
+impl TGM {
+    fn random(n: u32) -> u32{
+        n.wrapping_mul(0x41c64e6d).wrapping_add(12345) & 0xffffffff
+    }
+
+    fn read(&mut self) -> u32 {
+        self.seed = TGM::random(self.seed);
+        (self.seed >> 10) & 0x7fff
+    }
+}
+
+impl Randomizer for TGM {
+    fn populate_next(&mut self, pieces_data: &PiecesData, board_width: isize, board_height: isize) -> Vec<Piece> {
+        let mut b = 0;
+        for _ in 0..4{
+            b = self.read() % 7;
+            if !self.memory.contains(&(b as usize)){break;}
+            b = self.read() % 7;
+        }
+        self.memory.pop();
+        self.memory.insert(0, b as usize);
+        vec![Piece::create(pieces_data, b as usize, board_width, board_height)]
+    }
+
+    fn create() -> Self where Self: Sized {
+        let mut amazon_prime = TGM {
+            memory: vec![],
+            seed: match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+                Ok(n) => n.as_secs().try_into().unwrap(),
+                Err(_) => panic!("CLOCK???? mclock ⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰"),
+            }
+        };
+        let mut b = 0;
+        while b == 0 || b == 6 || b == 4 {
+            b = amazon_prime.read() as usize % 7;
+        }
+        amazon_prime.memory = vec![b, 0, 0, 0];
+        amazon_prime
     }
 }
