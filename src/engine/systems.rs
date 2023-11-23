@@ -1,8 +1,9 @@
 use super::{resources::Engine, rotation_systems::LockDelayMode, GameStates, GameloopStates, randomizers::*};
 use crate::engine::components::*;
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use bevy::{prelude::*, sprite::MaterialMesh2dBundle, render::view::ColorGrading};
 
 const MINO_SIZE: f32 = 20.0;
+const SMALL_MINO_SIZE: f32 = 10.0;
 
 pub fn reset_engine(mut commands: Commands){
     commands.remove_resource::<Engine>();
@@ -17,28 +18,48 @@ pub fn init_engine(
     mut old_board: Query<Entity, With<BoardVisual>>,
     mut next_state: ResMut<NextState<GameloopStates>>,
     mut game_next_state: ResMut<NextState<GameStates>>,
-) {
+    asset_server: Res<AssetServer>,
+) { // despawn old board
     for board in old_board.iter() {
         commands.entity(board).despawn();
     }
-    commands.spawn((
-        MaterialMesh2dBundle {
-            mesh: meshes
-                .add(Mesh::from(shape::Quad {
-                    size: Vec2 {
-                        x: engine.board.width as f32 * MINO_SIZE,
-                        y: engine.board.height as f32 * MINO_SIZE,
-                    },
-                    flip: false,
-                }))
-                .into(),
-            material: materials.add(ColorMaterial::from(Color::PURPLE)),
-            transform: Transform::from_xyz(0.0, 0.0, -1.0),
+    // spawn board
+    let board = commands.spawn((
+        SpriteBundle {
+            transform: Transform{
+                translation: Vec3 { x: 0.0, y: 0.0, z: -1.0},
+                rotation: Quat::default(),
+                scale: Vec3 { x: 0.5, y: 0.5, z: 1. },
+            },
+            texture: asset_server.load("border.png"),
+            sprite: Sprite {
+                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 },
+                ..default()
+            },
             ..default()
         },
         BoardVisual {},
-    ));
-    engine.init("ARS", Box::new(TGM::create()));
+    ))
+    .with_children( |parent| {
+        parent.spawn((SpriteBundle {
+            transform: Transform{
+                translation: Vec3 { x: 0.0, y: 487.0, z: -0.0},
+                rotation: Quat::default(),
+                scale: Vec3 { x: 1.0, y: 1.0, z: 1. },
+            },
+            texture: asset_server.load("board.png"),
+            sprite: Sprite {
+                color: Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 },
+                ..default()
+            },
+            ..default()
+        },
+    BoardVisual{}));
+    })
+    .id();
+
+    // init engine
+    engine.init("ARS", Box::new(Bag::create()));
     game_next_state.set(GameStates::Gameplay);
     next_state.set(GameloopStates::Falling);
 }
@@ -49,6 +70,7 @@ pub fn draw_board(
     all_minos: Query<Entity, With<Mino>>,
     asset_server: Res<AssetServer>,
 ) {
+    if !engine.is_changed(){return;}
     for mino in all_minos.iter() {
         commands.entity(mino).despawn();
     }
@@ -128,47 +150,6 @@ pub fn draw_board(
         None => {}
     }
 
-    // draw next queue
-    if engine.board.show_next > 0 {
-        y = 8.0;
-        let mut drawed = 0;
-        for mino in &engine.next_queue {
-            for tile in &engine.rotation_system.pieces[mino.id]
-                [mino.rotation]
-            {
-                commands.spawn((
-                    SpriteBundle {
-                        transform: Transform::from_xyz(
-                            11.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
-                                + MINO_SIZE / 2.0
-                                + tile.0 as f32 * MINO_SIZE,
-                            y * MINO_SIZE + MINO_SIZE / 2.0 + tile.1 as f32 * MINO_SIZE,
-                            0.0,
-                        ),
-                        texture: asset_server.load("default_mino.png"),
-                        sprite: Sprite {
-                            color: engine.rotation_system.colours[mino.id],
-                            custom_size: Some(Vec2 {
-                                x: MINO_SIZE,
-                                y: MINO_SIZE,
-                            }),
-                            ..default()
-                        },
-                        ..default()
-                    },
-                    Mino {
-                        color: engine.rotation_system.colours[mino.id],
-                    },
-                ));
-            }
-            y -= 4.0;
-            drawed += 1;
-            if drawed >= engine.board.show_next {
-                break;
-            }
-        }
-    }
-
     // draw hold
     match engine.hold.as_ref() {
         Some(piece) => {
@@ -176,27 +157,29 @@ pub fn draw_board(
                 commands.spawn((
                     SpriteBundle {
                         transform: Transform::from_xyz(
-                            -5.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
+                            0.0 * MINO_SIZE - (engine.board.width as f32) / 2.0 * MINO_SIZE
                                 + MINO_SIZE / 2.0
-                                + mino.0 as f32 * MINO_SIZE,
-                            -2.0 * MINO_SIZE
+                                + mino.0 as f32 * SMALL_MINO_SIZE + engine.rotation_system.spawn_offsets[piece.id].0 as f32 * SMALL_MINO_SIZE,
+                            1.0 * MINO_SIZE
                                 + (engine.board.height as f32) / 2.0 * MINO_SIZE
                                 + MINO_SIZE / 2.0
-                                + mino.1 as f32 * MINO_SIZE,
+                                + mino.1 as f32 * SMALL_MINO_SIZE + engine.rotation_system.spawn_offsets[piece.id].1 as f32 * SMALL_MINO_SIZE,
                             0.0,
                         ),
                         texture: asset_server.load("default_mino.png"),
                         sprite: Sprite {
                             color: piece.color,
                             custom_size: Some(Vec2 {
-                                x: MINO_SIZE,
-                                y: MINO_SIZE,
+                                x: SMALL_MINO_SIZE,
+                                y: SMALL_MINO_SIZE,
                             }),
                             ..default()
                         },
                         ..default()
                     },
-                    Mino { color: piece.color },
+                    Mino {
+                        color: engine.rotation_system.colours[piece.id],
+                    },
                 ));
             }
         }
@@ -246,6 +229,82 @@ pub fn draw_board(
             None => {}
         }
     }
+}
+
+pub fn draw_next(
+    mut commands: Commands,
+    engine: Res<Engine>,
+    all_minos: Query<Entity, With<UImino>>,
+    asset_server: Res<AssetServer>,
+){
+    for mino in all_minos.iter() {
+        commands.entity(mino).despawn();
+    }
+
+    let mut y: f32 = 11.0;
+    let mut x: f32 = 0.0;
+    // draw next queue
+    if engine.board.show_next > 0 {
+        let mut drawed = 0;
+        for mino in &engine.next_queue {
+            if drawed == 0 {
+                for tile in &engine.rotation_system.pieces[mino.id][mino.rotation]
+                {
+                    commands.spawn((
+                        SpriteBundle {
+                            transform: Transform::from_xyz(
+                                (x - 1.5) * MINO_SIZE + tile.0 as f32 * MINO_SIZE + engine.rotation_system.spawn_offsets[mino.id].0 as f32 * SMALL_MINO_SIZE,
+                                y * MINO_SIZE + MINO_SIZE / 2.0 + tile.1 as f32 * MINO_SIZE + engine.rotation_system.spawn_offsets[mino.id].1 as f32 * SMALL_MINO_SIZE,
+                                0.0,
+                            ),
+                            texture: asset_server.load("default_mino.png"),
+                            sprite: Sprite {
+                                color: engine.rotation_system.colours[mino.id],
+                                custom_size: Some(Vec2 {
+                                    x: MINO_SIZE,
+                                    y: MINO_SIZE,
+                                }),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        UImino{},
+                    ));
+                }
+                x += 7.0;
+            } else{
+                for tile in &engine.rotation_system.pieces[mino.id][mino.rotation]
+                {
+                    commands.spawn((
+                        SpriteBundle {
+                            transform: Transform::from_xyz(
+                                (x - 1.5) * SMALL_MINO_SIZE + tile.0 as f32 * SMALL_MINO_SIZE,
+                                y * MINO_SIZE + MINO_SIZE / 2.0 + tile.1 as f32 * SMALL_MINO_SIZE,
+                                0.0,
+                            ),
+                            texture: asset_server.load("default_mino.png"),
+                            sprite: Sprite {
+                                color: engine.rotation_system.colours[mino.id],
+                                custom_size: Some(Vec2 {
+                                    x: SMALL_MINO_SIZE,
+                                    y: SMALL_MINO_SIZE,
+                                }),
+                                ..default()
+                            },
+                            ..default()
+                        },
+                        UImino{},
+                    ));
+                }
+                x += 5.0;
+            }
+            drawed += 1;
+            if drawed >= engine.board.show_next {
+                break;
+            }
+        }
+    }
+
 }
 
 pub fn receive_input(
