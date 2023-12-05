@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use super::{resources::Engine, rotation_systems::LockDelayMode, GameStates, GameloopStates, randomizers::*};
 use crate::engine::components::*;
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle, render::view::ColorGrading};
@@ -390,14 +392,14 @@ pub fn gameloop(
     match engine.current_piece {
         Some(piece) => {
             if engine.handling.sdf_active {
-                engine.g_bucket += engine.g * engine.handling.sdf;
+                engine.g += engine.difficulty.gravity * engine.handling.sdf;
             } else {
-                engine.g_bucket += engine.g;
+                engine.g += engine.difficulty.gravity;
             }
             let mut gravity_tick_happend = false;
-            while engine.g_bucket >= 1.0 {
+            while engine.g >= 1.0 {
                 engine.move_current_piece((0, -1));
-                engine.g_bucket -= 1.0;
+                engine.g -= 1.0;
                 gravity_tick_happend = true;
             }
             let previos_lock_delay_active = engine.lock_delay_active;
@@ -414,13 +416,13 @@ pub fn gameloop(
                         }
                     }
                     LockDelayMode::ResetOnYChange => {
-                        engine.lock_delay_left -= 1;
+                        engine.lock_delay -= 1;
                     }
                     LockDelayMode::ResetOnMovementLimited => {
-                        engine.lock_delay_left -= 1;
+                        engine.lock_delay -= 1;
                     }
                     LockDelayMode::ResetOnMovement => {
-                        engine.lock_delay_left -= 1;
+                        engine.lock_delay -= 1;
                     }
                 }
             } else {
@@ -429,23 +431,23 @@ pub fn gameloop(
                         LockDelayMode::Disabled => {}
                         LockDelayMode::Gravity => {}
                         LockDelayMode::ResetOnYChange => {
-                            engine.lock_delay_left = engine.lock_delay;
+                            engine.lock_delay = engine.difficulty.lock_delay;
                             if engine.lock_delay_resets == 0 {
                                 engine.need_to_lock = true;
                             } else {
-                                engine.lock_delay_resets_left -= 1;
+                                engine.lock_delay_resets -= 1;
                             }
                         }
                         LockDelayMode::ResetOnMovementLimited => {
-                            engine.lock_delay_left = engine.lock_delay;
+                            engine.lock_delay = engine.difficulty.lock_delay;
                         }
                         LockDelayMode::ResetOnMovement => {
-                            engine.lock_delay_left = engine.lock_delay;
+                            engine.lock_delay = engine.difficulty.lock_delay;
                         }
                     }
                 }
             }
-            if (engine.lock_delay_left < 1 || engine.need_to_lock)
+            if (engine.lock_delay < 1 || engine.need_to_lock)
                 && !engine
                     .position_is_valid((piece.position.0, piece.position.1 - 1), piece.rotation)
             {
@@ -458,7 +460,7 @@ pub fn gameloop(
     for mut text in lock_delay_text.iter_mut() {
         text.sections[0].value = format!(
             "{}; {}",
-            engine.lock_delay_resets_left, engine.lock_delay_left
+            engine.lock_delay_resets, engine.lock_delay
         );
     }
 }
@@ -468,10 +470,20 @@ pub fn after_locking_routine(
     mut next_state: ResMut<NextState<GameloopStates>>,
 ) {
     engine.board.clear_full_lines();
-    engine.lock_delay_left = engine.lock_delay;
-    engine.lock_delay_resets_left = engine.lock_delay_resets;
-    engine.lock_delay_active = false;
     next_state.set(GameloopStates::Spawn);
+
+}
+
+pub fn run_spawn_delay(
+    mut engine: ResMut<Engine>,
+    mut next_state: ResMut<NextState<GameloopStates>>,
+){
+    if engine.spawn_delay > 0 {
+        engine.spawn_delay -= 1; 
+    }else{
+        engine.spawn_delay = engine.difficulty.spawn_delay;
+        next_state.set(GameloopStates::Falling);
+    }
 }
 
 pub fn spawn_routine(
@@ -479,6 +491,9 @@ pub fn spawn_routine(
     mut next_state: ResMut<NextState<GameloopStates>>,
     mut game_next_state: ResMut<NextState<GameStates>>,
 ) {
+    engine.lock_delay = engine.difficulty.lock_delay;
+    engine.lock_delay_resets = engine.difficulty.lock_delay_resets;
+    engine.lock_delay_active = false;
     if engine.spawn_sequence() {
         next_state.set(GameloopStates::Falling);
     } else {

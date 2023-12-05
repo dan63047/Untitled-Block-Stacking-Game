@@ -22,6 +22,87 @@ impl Piece {
     }
 }
 
+pub struct Difficulty { // that struct pretty much describes rules
+    pub gravity: f32, // G
+    pub lock_delay: u8, // frames
+    pub lock_delay_resets: u8, // times
+    pub spawn_delay: u8, // frames
+    pub line_clear_delay: u8, // frames
+    pub stack_invis: bool,
+    pub stack_invis_delay: u8, // frames
+    pub next_allowed: u8, // num of next pieces to preview
+    pub hold_allowed: bool
+}
+
+pub struct DelayMilliseconds {
+    value: f32,
+    left: f32,
+    pub active: bool
+}
+
+impl DelayMilliseconds {
+    fn get_delay(&self) -> f32 {
+        self.value
+    }
+
+    fn get_delay_left(&self) -> f32 {
+        self.left
+    }
+
+    fn create(delay: f32) -> DelayMilliseconds{
+        DelayMilliseconds { value: delay, left: delay, active: false }
+    }
+
+    fn reset(&mut self) {
+        self.left = self.value;
+    }
+
+    fn tick(&mut self, delta: f32) {
+        if self.active && self.left > 0.0 {
+            self.left -= delta;
+            if self.left < 0.0 { self.left = 0.0; }
+        }
+    }
+    
+    fn is_done(&self) -> bool {
+        self.left == 0.0
+    }
+}
+
+pub struct DelayFrames {
+    value: u8,
+    left: u8,
+    pub active: bool
+}
+
+impl DelayFrames {
+    fn get_delay(&self) -> u8 {
+        self.value
+    }
+
+    fn get_delay_left(&self) -> u8 {
+        self.left
+    }
+ 
+    fn create(delay: u8) -> DelayFrames{
+        DelayFrames { value: delay, left: delay, active: false }
+    }
+
+    fn reset(&mut self) {
+        self.left = self.value;
+    }
+
+    fn tick(&mut self) {
+        if self.active && self.left > 0 {
+            self.left -= 1;
+        }
+    }
+    
+    fn is_done(&self) -> bool {
+        self.left == 0
+    }
+}
+
 pub struct Board{
     pub width: u8,
     pub height: u8,
@@ -131,19 +212,17 @@ pub struct Engine {
     pub current_piece: Option<Piece>,
     pub board: Board,
     pub handling: Handling,
+    pub difficulty: Difficulty,
     pub rotation_system: PiecesData,
     pub randomizer: Box<dyn Randomizer + Sync + Send>,
     pub next_queue: Vec<Piece>,
     pub hold: Option<Piece>,
-    pub can_hold: bool, // anti-abuse
-    pub hold_enabled: bool, // game rule
+    pub can_hold: bool,
     pub g: f32,
-    pub g_bucket: f32,
     pub lock_delay: u8,
-    pub lock_delay_left: u8,
     pub lock_delay_resets: u8,
-    pub lock_delay_resets_left: u8,
     pub lock_delay_active: bool,
+    pub spawn_delay: u8,
     pub need_to_lock: bool, // when lock resets ended
 }
 
@@ -153,18 +232,16 @@ impl Default for Engine {
             current_piece: None,
             board: Board::create(10, 20, 20, true, true, 3),
             handling: Handling::create(200.0, 33.0, 20.0),
+            difficulty: Difficulty { gravity: 1.0/60.0, lock_delay: 30, lock_delay_resets: 15, spawn_delay: 30, line_clear_delay: 20, stack_invis: false, stack_invis_delay: 240, next_allowed: 3, hold_allowed: true },
             rotation_system: ROTATION_SYSTEMS["SRS"].clone(),
             next_queue: vec![],
             hold: None,
             can_hold: true,
-            hold_enabled: true,
-            g: 1.0/60.0,
-            g_bucket: 0.0,
+            g: 0.0,
             lock_delay: 30,
-            lock_delay_left: 30,
             lock_delay_resets: 15,
-            lock_delay_resets_left: 15,
             lock_delay_active: false,
+            spawn_delay: 0,
             need_to_lock: false,
             randomizer: Box::new(Bag{}),
         }
@@ -183,6 +260,7 @@ impl Engine {
     pub fn init(&mut self, rotation_system: &str, randomizer: Box<dyn Randomizer + Sync + Send>){
         self.rotation_system = ROTATION_SYSTEMS[rotation_system].clone();
         self.randomizer = randomizer;
+        self.spawn_delay = self.difficulty.spawn_delay;
         while self.next_queue.len() <= self.board.show_next as usize  {
             self.next_queue.append(&mut self.randomizer.populate_next(&self.rotation_system, self.board.width as isize, self.board.height as isize));
         }
@@ -200,7 +278,7 @@ impl Engine {
     }
 
     pub fn hold_current_piece(&mut self) -> bool {
-        if  !self.hold_enabled || !self.can_hold {
+        if  !self.difficulty.hold_allowed || !self.can_hold {
             return false;
         }
         self.current_piece.as_mut().unwrap().rotation = 0;
@@ -263,18 +341,18 @@ impl Engine {
             LockDelayMode::ResetOnYChange => {},
             LockDelayMode::ResetOnMovementLimited => {
                 if !self.position_is_valid((self.current_piece.as_ref().unwrap().position.0, self.current_piece.as_ref().unwrap().position.1-1), self.current_piece.as_ref().unwrap().rotation){
-                    self.lock_delay_left = self.lock_delay;
-                    if self.lock_delay_resets_left == 0{
+                    self.lock_delay = self.difficulty.lock_delay;
+                    if self.lock_delay_resets == 0{
                         self.need_to_lock = true;
                     }else{
-                        self.lock_delay_resets_left -= 1;
+                        self.lock_delay_resets -= 1;
                         self.lock_delay_active = false;
                     }
                 }
             },
             LockDelayMode::ResetOnMovement => {
                 if !self.position_is_valid((self.current_piece.as_ref().unwrap().position.0, self.current_piece.as_ref().unwrap().position.1-1), self.current_piece.as_ref().unwrap().rotation){
-                    self.lock_delay_left = self.lock_delay;
+                    self.lock_delay = self.difficulty.lock_delay;
                     self.lock_delay_active = false;
                 }
             },
